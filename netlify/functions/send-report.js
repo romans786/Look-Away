@@ -62,6 +62,14 @@ const createReportPdf = ({ memberName, startDate, endDate, createdAt, generalCom
   document.end();
 });
 
+const getDeliveryError = (error) => {
+  if (error?.code === 'EAUTH' || error?.responseCode === 535) return 'SMTP authentication failed. Check REPORT_FROM_EMAIL and GMASS_API_KEY.';
+  if (error?.code === 'ETIMEDOUT' || error?.code === 'ECONNECTION' || error?.code === 'ESOCKET') return 'Could not connect to the GMass SMTP server.';
+  if (error?.code === 'EENVELOPE') return 'GMass rejected one or more recipient addresses.';
+  if (error?.name === 'Error' && error?.message?.includes('PDF')) return 'The PDF report could not be generated.';
+  return 'The report email could not be sent.';
+};
+
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
 
@@ -106,9 +114,14 @@ export const handler = async (event) => {
       host: 'smtp.gmass.co',
       port: 2525,
       secure: false,
+      requireTLS: true,
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
       auth: { user: from, pass: gmassApiKey },
     });
 
+    await transporter.verify();
     await transporter.sendMail({
       from,
       to: uniqueRecipients,
@@ -157,7 +170,12 @@ export const handler = async (event) => {
 
     return json(200, { sent: true, recipients: uniqueRecipients });
   } catch (error) {
-    console.error('GMass SMTP delivery failed', error);
-    return json(502, { error: 'The report email could not be sent.' });
+    console.error('GMass SMTP delivery failed', {
+      code: error?.code,
+      responseCode: error?.responseCode,
+      command: error?.command,
+      message: error?.message,
+    });
+    return json(502, { error: getDeliveryError(error) });
   }
 };
