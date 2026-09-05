@@ -5,6 +5,9 @@
   command = "npm run build"
   publish = "dist"
 
+[build.environment]
+  REPORT_FROM_EMAIL = "reignsromans786@gmail.com"
+
 [dev]
   command = "npm run dev"
   targetPort = 3000
