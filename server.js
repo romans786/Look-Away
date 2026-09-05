@@ -93,11 +93,12 @@ app.post('/api/send-report', async (request, response) => {
       ? triggers.map((entry) => `- ${entry.trigger}${entry.comment ? `: ${entry.comment}` : ''}`).join('\n')
       : 'No triggers logged.';
     const pdf = await createReportPdf({ memberName, startDate, endDate, createdAt, generalComments, triggers });
+    const smtpPort = Number(process.env.GMASS_SMTP_PORT || 2525);
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmass.co',
-      port: Number(process.env.GMASS_SMTP_PORT || 2525),
-      secure: false,
-      requireTLS: true,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      requireTLS: smtpPort !== 465,
       connectionTimeout: 10000,
       greetingTimeout: 10000,
       socketTimeout: 15000,
