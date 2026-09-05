@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import PDFDocument from 'pdfkit';
 
 const json = (statusCode, body) => ({
   statusCode,
@@ -12,6 +13,54 @@ const escapeHtml = (value) => String(value ?? '')
   .replaceAll('>', '&gt;')
   .replaceAll('"', '&quot;')
   .replaceAll("'", '&#039;');
+
+const createReportPdf = ({ memberName, startDate, endDate, createdAt, generalComments, triggers }) => new Promise((resolve, reject) => {
+  const document = new PDFDocument({ size: 'A4', margin: 48, info: { Title: 'Look Away Report', Author: 'Look Away' } });
+  const chunks = [];
+
+  document.on('data', (chunk) => chunks.push(chunk));
+  document.on('end', () => resolve(Buffer.concat(chunks)));
+  document.on('error', reject);
+
+  document.rect(0, 0, document.page.width, 92).fill('#101b2b');
+  document.fillColor('#e7d59c').fontSize(10).font('Helvetica-Bold').text('LOOK AWAY', 48, 27, { characterSpacing: 2 });
+  document.fillColor('#ffffff').fontSize(24).font('Helvetica-Bold').text('Accountability Report', 48, 47);
+  document.fillColor('#765b24').fontSize(10).font('Helvetica').text('PRIVATE REPORT', 48, 112, { characterSpacing: 1.5 });
+
+  document.fillColor('#1d2430').fontSize(11).font('Helvetica-Bold').text('Report details', 48, 142);
+  document.moveTo(48, 160).lineTo(547, 160).lineWidth(1).stroke('#c9982c');
+  document.font('Helvetica-Bold').fontSize(10).fillColor('#68717d').text('MEMBER', 48, 178);
+  document.font('Helvetica').fontSize(12).fillColor('#1d2430').text(memberName, 48, 193);
+  document.font('Helvetica-Bold').fontSize(10).fillColor('#68717d').text('PERIOD', 310, 178);
+  document.font('Helvetica').fontSize(12).fillColor('#1d2430').text(`${startDate} to ${endDate}`, 310, 193);
+  document.font('Helvetica-Bold').fontSize(10).fillColor('#68717d').text('CREATED', 48, 225);
+  document.font('Helvetica').fontSize(12).fillColor('#1d2430').text(createdAt, 48, 240);
+
+  document.font('Helvetica-Bold').fontSize(15).fillColor('#765b24').text('Comments', 48, 290);
+  document.font('Helvetica').fontSize(11).fillColor('#1d2430').text(generalComments, 48, 314, { width: 499, lineGap: 5 });
+
+  const commentsBottom = document.y;
+  document.font('Helvetica-Bold').fontSize(15).fillColor('#765b24').text('Triggers', 48, commentsBottom + 30);
+  const triggerRows = triggers.length ? triggers : [{ trigger: 'No triggers logged.', comment: '' }];
+  let triggerY = document.y + 12;
+  triggerRows.forEach(({ trigger, comment }) => {
+    if (triggerY > 730) {
+      document.addPage();
+      triggerY = 54;
+    }
+    document.circle(56, triggerY + 6, 3).fill('#c9982c');
+    document.font('Helvetica-Bold').fontSize(11).fillColor('#1d2430').text(trigger, 68, triggerY, { width: 479 });
+    triggerY = document.y;
+    if (comment) {
+      document.font('Helvetica-Oblique').fontSize(10).fillColor('#68717d').text(comment, 68, triggerY + 2, { width: 479 });
+      triggerY = document.y;
+    }
+    triggerY += 12;
+  });
+
+  document.font('Helvetica').fontSize(9).fillColor('#68717d').text('Sent by Look Away', 48, 780, { align: 'center', width: 499 });
+  document.end();
+});
 
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
@@ -43,7 +92,16 @@ export const handler = async (event) => {
     const endDate = report.endDate;
     const createdAt = report.createdAt;
     const generalComments = report.generalComments || 'No general comments recorded.';
+    const triggers = Array.isArray(report.triggers) ? report.triggers : [];
     const subject = `Look Away report: ${startDate} to ${endDate}`;
+    const pdf = await createReportPdf({
+      memberName,
+      startDate,
+      endDate,
+      createdAt,
+      generalComments,
+      triggers,
+    });
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmass.co',
       port: 2525,
@@ -82,12 +140,19 @@ export const handler = async (event) => {
         <h2 style="font-size:17px;color:#765b24;margin:24px 0 8px;">Comments</h2>
         <p style="white-space:pre-line;">${escapeHtml(generalComments)}</p>
         <h2 style="font-size:17px;color:#765b24;margin:24px 0 8px;">Triggers</h2>
-        <p style="white-space:pre-line;">${escapeHtml(triggerSummary)}</p>
+        <div style="border-top:1px solid #eee7d5;">${triggers.length
+          ? triggers.map(({ trigger, comment }) => `<div style="padding:12px 0;border-bottom:1px solid #eee7d5;"><strong>${escapeHtml(trigger)}</strong>${comment ? `<div style="margin-top:4px;color:#68717d;">${escapeHtml(comment)}</div>` : ''}</div>`).join('')
+          : '<div style="padding:12px 0;color:#68717d;">No triggers logged.</div>'}</div>
       </div>
       <p style="font-size:12px;color:#68717d;text-align:center;">Sent by Look Away</p>
     </div>
   </body>
 </html>`,
+      attachments: [{
+        filename: `look-away-report-${startDate}-to-${endDate}.pdf`,
+        content: pdf,
+        contentType: 'application/pdf',
+      }],
     });
 
     return json(200, { sent: true, recipients: uniqueRecipients });
