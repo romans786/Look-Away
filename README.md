@@ -23,13 +23,13 @@ View your app in AI Studio: https://ai.studio/apps/c127550e-b3c8-4a9f-a6e0-f9fb0
 
 The primary report email is saved as the user's default and remains prefilled until changed. The optional secondary email is used only for the current report and starts blank on the next report.
 
-Automatic delivery uses the Netlify Function at `/.netlify/functions/send-report` and GMass SMTP. Configure these environment variables in Netlify:
+Automatic delivery uses the local Express API at `/api/send-report` and GMass SMTP. Configure these environment variables in `.env`:
 
 - `GMASS_API_KEY`: Your GMass API key, used as the SMTP password
 - `REPORT_FROM_EMAIL`: The GMass account email and sender address
 - `GMASS_SMTP_PORT`: Optional SMTP port; defaults to `2525` (GMass also supports `587`)
 
-When a report is created, its contents are sent to the primary address and, when provided, the secondary address. Each email includes a formatted HTML report and a PDF attachment.
+When a report is created, its contents are sent to the primary address and, when provided, the secondary address. Each email includes a formatted HTML report and a PDF attachment. The server must run on a host that allows outbound connections to `smtp.gmass.co`; some development containers block SMTP traffic.
 
 ## Android and iOS
 

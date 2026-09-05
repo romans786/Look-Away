@@ -560,7 +560,7 @@ export default function App() {
               }));
               setLastReport(report);
               setReports((previous) => [report, ...previous]);
-              void fetch('/.netlify/functions/send-report', {
+              void fetch('/api/send-report', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
