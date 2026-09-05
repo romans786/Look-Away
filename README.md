@@ -27,6 +27,7 @@ Automatic delivery uses the Netlify Function at `/.netlify/functions/send-report
 
 - `GMASS_API_KEY`: Your GMass API key, used as the SMTP password
 - `REPORT_FROM_EMAIL`: The GMass account email and sender address
+- `GMASS_SMTP_PORT`: Optional SMTP port; defaults to `2525` (GMass also supports `587`)
 
 When a report is created, its contents are sent to the primary address and, when provided, the secondary address. Each email includes a formatted HTML report and a PDF attachment.
 

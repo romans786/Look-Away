@@ -70,6 +70,8 @@ const getDeliveryError = (error) => {
   return 'The report email could not be sent.';
 };
 
+const getDeliveryErrorCode = (error) => error?.code || (error?.responseCode ? `SMTP_${error.responseCode}` : 'UNKNOWN');
+
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });
 
@@ -112,7 +114,7 @@ export const handler = async (event) => {
     });
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmass.co',
-      port: 2525,
+      port: Number(process.env.GMASS_SMTP_PORT || 2525),
       secure: false,
       requireTLS: true,
       connectionTimeout: 10000,
@@ -176,6 +178,6 @@ export const handler = async (event) => {
       command: error?.command,
       message: error?.message,
     });
-    return json(502, { error: getDeliveryError(error) });
+    return json(502, { error: getDeliveryError(error), code: getDeliveryErrorCode(error) });
   }
 };
